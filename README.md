@@ -63,6 +63,36 @@ The platform enables users to browse, filter, and discover creators based on nic
 
 ---
 
+## OAuth Setup
+
+### YouTube / Google
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/).
+2. Create or select a project.
+3. Enable `YouTube Data API v3`.
+4. Configure the OAuth consent screen.
+5. Create an `OAuth client ID` for a `Web application`.
+6. Add this redirect URI:
+   - `http://localhost:3000/api/auth/callback/youtube`
+7. Copy the values into `.env.local`:
+
+```env
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
+```
+
+### Instagram / Meta
+
+Add your existing Meta app values to `.env.local` too:
+
+```env
+NEXT_PUBLIC_INSTAGRAM_APP_ID=your-instagram-app-id
+INSTAGRAM_APP_SECRET=your-instagram-app-secret
+```
+
+---
+
 ## AI Integration
 
 - Uses AI-powered search to understand natural language creator queries

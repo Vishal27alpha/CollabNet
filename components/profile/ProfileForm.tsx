@@ -20,12 +20,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Save, Instagram } from 'lucide-react';
+import { Loader2, Save, Instagram, Youtube } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 const INSTAGRAM_APP_ID = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID;
-const REDIRECT_URI = "http://localhost:3000/api/auth/callback/instagram";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const REDIRECT_URI = `${APP_URL}/api/auth/callback/instagram`;
+const YOUTUBE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+const YOUTUBE_REDIRECT_URI = `${APP_URL}/api/auth/callback/youtube`;
 
 export function ProfileForm() {
   const [user, loading] = useAuthState(auth);
@@ -33,6 +36,7 @@ export function ProfileForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isFetchingIG, setIsFetchingIG] = useState(false);
+  const [isFetchingYT, setIsFetchingYT] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -405,12 +409,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Save, Instagram } from 'lucide-react';
+import { Loader2, Save, Instagram, Youtube } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 const INSTAGRAM_APP_ID = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID;
-const REDIRECT_URI = "http://localhost:3000/api/auth/callback/instagram";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const REDIRECT_URI = `${APP_URL}/api/auth/callback/instagram`;
+const YOUTUBE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+const YOUTUBE_REDIRECT_URI = `${APP_URL}/api/auth/callback/youtube`;
 
 export function ProfileForm() {
   const [user, loading] = useAuthState(auth);
@@ -418,6 +425,7 @@ export function ProfileForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isFetchingIG, setIsFetchingIG] = useState(false);
+  const [isFetchingYT, setIsFetchingYT] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -438,12 +446,18 @@ export function ProfileForm() {
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        setProfile(docSnap.data() as Creator);
+        const creatorData = docSnap.data() as Creator;
+        setProfile({
+          ...creatorData,
+          platform: creatorData.platform || (creatorData.youtubeHandle ? 'youtube' : 'instagram'),
+          followerCount: Number(creatorData.followerCount ?? 0) || 0,
+        });
       } else {
         setProfile({
           name: user.displayName || '',
           email: user.email || '',
           profileImage: user.photoURL || '',
+          platform: 'instagram',
           followerCount: 0, // guarantee numeric default
         });
       }
@@ -493,15 +507,46 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
   // Facebook Login for Graph API
   const handleInstagramLogin = () => {
+    setProfile((prev) => ({ ...prev, platform: 'instagram' }));
     const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${INSTAGRAM_APP_ID}&redirect_uri=${encodeURIComponent(
       REDIRECT_URI
     )}&scope=pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_insights&response_type=code`;
     window.location.href = authUrl;
   };
 
+  const handleYouTubeLogin = () => {
+    if (!YOUTUBE_CLIENT_ID) {
+      toast({
+        title: "YouTube OAuth not configured",
+        description: "Add NEXT_PUBLIC_GOOGLE_CLIENT_ID before connecting a YouTube account.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setProfile((prev) => ({ ...prev, platform: 'youtube' }));
+    setIsFetchingYT(true);
+
+    const authUrl =
+      `https://accounts.google.com/o/oauth2/v2/auth?` +
+      new URLSearchParams({
+        client_id: YOUTUBE_CLIENT_ID,
+        redirect_uri: YOUTUBE_REDIRECT_URI,
+        response_type: "code",
+        access_type: "offline",
+        include_granted_scopes: "true",
+        prompt: "consent",
+        scope: "https://www.googleapis.com/auth/youtube.readonly",
+      }).toString();
+
+    window.location.href = authUrl;
+  };
+
   // After redirect back from /api/auth/callback/instagram
   useEffect(() => {
     const token = searchParams.get("token");
+    const youtubeAccessToken = searchParams.get("youtube_access_token");
+    const youtubeError = searchParams.get("youtube_error");
     const warn = searchParams.get("warn");
 
     if (warn === "missing_scopes") {
@@ -512,7 +557,15 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       });
     }
 
-    if (!token) return;
+    if (youtubeError) {
+      toast({
+        title: "YouTube connection failed",
+        description: `Google returned: ${youtubeError}`,
+        variant: "destructive",
+      });
+      router.replace("/profile");
+      return;
+    }
 
     const fetchInstagramData = async () => {
       try {
@@ -524,7 +577,9 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (res.ok && data.username) {
           setProfile((prev) => ({
             ...prev,
+            platform: 'instagram',
             instagramHandle: data.username,
+            youtubeHandle: '',
             followerCount: data.followers_count ?? 0,
             bio: data.biography ?? "",
           }));
@@ -552,7 +607,53 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       }
     };
 
-    fetchInstagramData();
+    const fetchYouTubeData = async () => {
+      try {
+        setIsFetchingYT(true);
+        const res = await fetch(`/api/auth/callback/youtube/channel?access_token=${youtubeAccessToken}`);
+        const data = await res.json();
+
+        if (res.ok && (data.channel_title || data.channel_handle)) {
+          setProfile((prev) => ({
+            ...prev,
+            platform: 'youtube',
+            youtubeHandle: data.channel_handle || data.channel_title || '',
+            youtubeChannelId: data.channel_id || '',
+            youtubeChannelTitle: data.channel_title || '',
+            youtubeThumbnailUrl: data.thumbnail_url || '',
+            instagramHandle: '',
+            followerCount: Number(data.subscriber_count ?? 0),
+            bio: data.description ?? '',
+          }));
+          toast({
+            title: "YouTube Connected",
+            description: `Fetched ${data.channel_title || data.channel_handle}`,
+          });
+        } else {
+          toast({
+            title: "Failed to fetch YouTube data",
+            description: data?.error ?? "No YouTube channel found for this Google account.",
+            variant: "destructive",
+          });
+        }
+      } catch (err: any) {
+        console.error("Error fetching YouTube data:", err);
+        toast({
+          title: "Error",
+          description: err.message || "Unable to fetch YouTube data",
+          variant: "destructive",
+        });
+      } finally {
+        setIsFetchingYT(false);
+        router.replace("/profile");
+      }
+    };
+
+    if (token) {
+      fetchInstagramData();
+    } else if (youtubeAccessToken) {
+      fetchYouTubeData();
+    }
   }, [searchParams, router, toast]);
 
 // Generate embedding using Gemini
@@ -576,7 +677,12 @@ async function generateEmbedding(text: string): Promise<number[]> {
         uid: user.uid,
         name: profile.name || '',
         email: profile.email || user.email || '',
+        platform: profile.platform || 'instagram',
         instagramHandle: profile.instagramHandle || '',
+        youtubeHandle: profile.youtubeHandle || '',
+        youtubeChannelId: profile.youtubeChannelId || '',
+        youtubeChannelTitle: profile.youtubeChannelTitle || '',
+        youtubeThumbnailUrl: profile.youtubeThumbnailUrl || '',
         niche: profile.niche || '',
         //followerCount: Number(profile.followerCount) || 0,
         followerCount: (() => {
@@ -622,69 +728,123 @@ creatorData.embedding = await generateEmbedding(combinedText);
   }
 
   return (
-    <Card className="max-w-2xl mx-auto">
+    <Card className="mx-auto max-w-4xl rounded-[28px] border border-[#D8D1F4] bg-white shadow-[0_12px_34px_rgba(83,74,183,0.08)] dark:border-border dark:bg-card dark:shadow-none">
       <CardHeader>
-        <CardTitle className="text-2xl">Complete Your Profile</CardTitle>
+        <CardTitle className="text-3xl font-black tracking-tight text-[#2F2A78] dark:text-foreground">
+          Complete Your Profile
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Profile Photo */}
           <div className="space-y-2">
-            <Label>Profile Photo</Label>
+            <Label className="text-base font-semibold text-[#2F2A78] dark:text-foreground">Profile Photo</Label>
             <div className="flex items-center space-x-4">
               {profile.profileImage && typeof profile.profileImage === "string" && (
                 <img
                   src={profile.profileImage}
                   alt="Profile Preview"
-                  className="h-16 w-16 rounded-full object-cover"
+                  className="h-16 w-16 rounded-full border border-[#E5E0FB] object-cover"
                 />
               )}
-              <Input type="file" accept="image/*" onChange={handleImageUpload} />
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="border-[#D6D0F7] bg-[#FCFBFF] text-slate-700 focus-visible:ring-[#8E87E8] dark:border-input dark:bg-background dark:text-foreground"
+              />
             </div>
-            {uploadingImage && <p className="text-sm text-gray-500">Processing...</p>}
+            {uploadingImage && <p className="text-sm text-slate-500 dark:text-gray-500">Processing...</p>}
           </div>
 
           {/* Basic Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name *</Label>
+              <Label htmlFor="name" className="text-base font-semibold text-[#2F2A78] dark:text-foreground">Full Name *</Label>
               <Input
                 id="name"
                 required
                 value={profile.name || ''}
                 onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                className="border-[#D6D0F7] bg-[#FCFBFF] text-slate-700 focus-visible:ring-[#8E87E8] dark:border-input dark:bg-background dark:text-foreground"
               />
             </div>
             <div className="space-y-2">
-              <Label>Instagram Handle *</Label>
+              <Label className="text-base font-semibold text-[#2F2A78] dark:text-foreground">
+                {profile.platform === 'youtube' ? 'YouTube Channel *' : 'Instagram Handle *'}
+              </Label>
               <Input
-                value={profile.instagramHandle ? `@${profile.instagramHandle}` : ''}
+                value={
+                  profile.platform === 'youtube'
+                    ? (profile.youtubeHandle || '')
+                    : profile.instagramHandle
+                      ? `@${profile.instagramHandle}`
+                      : ''
+                }
                 readOnly
+                className="border-[#D6D0F7] bg-[#F4F1FF] text-slate-500 focus-visible:ring-[#8E87E8] dark:border-input dark:bg-background dark:text-foreground"
               />
             </div>
           </div>
 
-          {/* Instagram Connect Button */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleInstagramLogin}
-            disabled={isFetchingIG}
-            className="w-full flex items-center justify-center space-x-2"
-          >
-            {isFetchingIG ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Instagram className="h-4 w-4" />
-            )}
-            <span>{isFetchingIG ? "Fetching data..." : "Fetch Instagram Data"}</span>
-          </Button>
+          <div className="space-y-2">
+            <Label className="text-base font-semibold text-[#2F2A78] dark:text-foreground">Platform *</Label>
+            <Select
+              value={profile.platform || 'instagram'}
+              onValueChange={(value: 'instagram' | 'youtube') =>
+                setProfile((prev) => ({
+                  ...prev,
+                  platform: value,
+                }))
+              }
+            >
+              <SelectTrigger className="border-[#D6D0F7] bg-[#FCFBFF] text-slate-700 focus:ring-[#8E87E8] dark:border-input dark:bg-background dark:text-foreground">
+                <SelectValue placeholder="Select platform" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="instagram">Instagram creator</SelectItem>
+                <SelectItem value="youtube">YouTube creator</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {profile.platform === 'youtube' ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleYouTubeLogin}
+              disabled={isFetchingYT}
+              className="h-14 w-full rounded-[18px] border border-[#F3C28C] bg-white text-lg font-semibold text-[#C36E12] shadow-[0_8px_24px_rgba(195,110,18,0.08)] hover:bg-[#FFF5E8] dark:border-amber-500 dark:bg-background dark:text-amber-300 dark:shadow-none dark:hover:bg-[#22180d] flex items-center gap-3"
+            >
+              {isFetchingYT ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Youtube className="h-4 w-4" />
+              )}
+              <span>{isFetchingYT ? "Fetching data..." : "Fetch YouTube Account"}</span>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleInstagramLogin}
+              disabled={isFetchingIG}
+              className="h-14 w-full rounded-[18px] border border-[#C7C1F4] bg-white text-lg font-semibold text-[#534AB7] shadow-[0_8px_24px_rgba(83,74,183,0.06)] hover:bg-[#F4F1FF] dark:border-purple-600 dark:bg-background dark:text-purple-300 dark:shadow-none dark:hover:bg-[#171220] flex items-center gap-3"
+            >
+              {isFetchingIG ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Instagram className="h-4 w-4" />
+              )}
+              <span>{isFetchingIG ? "Fetching data..." : "Fetch Instagram Account"}</span>
+            </Button>
+          )}
 
           {/* Niche and Followers */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Niche */}
             <div className="space-y-2">
-              <Label>Niche *</Label>
+              <Label className="text-base font-semibold text-[#2F2A78] dark:text-foreground">Niche *</Label>
               <Select
                 value={profile.niche && !NICHES.includes(profile.niche) ? "other" : profile.niche}
                 onValueChange={(value) => {
@@ -695,7 +855,7 @@ creatorData.embedding = await generateEmbedding(combinedText);
                   }
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="border-[#D6D0F7] bg-[#FCFBFF] text-slate-700 focus:ring-[#8E87E8] dark:border-input dark:bg-background dark:text-foreground">
                   <SelectValue placeholder="Select your niche" />
                 </SelectTrigger>
                 <SelectContent>
@@ -713,30 +873,41 @@ creatorData.embedding = await generateEmbedding(combinedText);
                   placeholder="Enter your niche"
                   value={profile.niche || ""}
                   onChange={(e) => setProfile({ ...profile, niche: e.target.value })}
+                  className="border-[#D6D0F7] bg-[#FCFBFF] text-slate-700 focus-visible:ring-[#8E87E8] dark:border-input dark:bg-background dark:text-foreground"
                 />
               )}
             </div>
 
             <div className="space-y-2">
-              <Label>Follower Count</Label>
+              <Label className="text-base font-semibold text-[#2F2A78] dark:text-foreground">
+                {profile.platform === 'youtube' ? 'Subscriber Count' : 'Follower Count'}
+              </Label>
               <Input
                 type="number"
                 //value={profile.followerCount?.toString() || ''}
                 value={profile.followerCount !== undefined && profile.followerCount !== null ? String(profile.followerCount) : ''}
                 readOnly
+                className="border-[#D6D0F7] bg-[#F4F1FF] text-slate-500 focus-visible:ring-[#8E87E8] dark:border-input dark:bg-background dark:text-foreground"
               />
             </div>
           </div>
 
           {/* Instagram Bio */}
           <div className="space-y-2">
-            <Label>Instagram Bio</Label>
-            <Textarea value={profile.bio || ''} readOnly rows={3} />
+            <Label className="text-base font-semibold text-[#2F2A78] dark:text-foreground">
+              {profile.platform === 'youtube' ? 'YouTube Bio' : 'Instagram Bio'}
+            </Label>
+            <Textarea
+              value={profile.bio || ''}
+              readOnly
+              rows={3}
+              className="border-[#D6D0F7] bg-[#F4F1FF] text-slate-500 focus-visible:ring-[#8E87E8] dark:border-input dark:bg-background dark:text-foreground"
+            />
           </div>
 
           {/* About You */}
           <div className="space-y-2">
-            <Label htmlFor="about">About You *</Label>
+            <Label htmlFor="about" className="text-base font-semibold text-[#2F2A78] dark:text-foreground">About You *</Label>
             <Textarea
               id="about"
               required
@@ -744,22 +915,28 @@ creatorData.embedding = await generateEmbedding(combinedText);
               rows={4}
               value={profile.about || ''}
               onChange={(e) => setProfile({ ...profile, about: e.target.value })}
+              className="border-[#D6D0F7] bg-[#FCFBFF] text-slate-700 focus-visible:ring-[#8E87E8] dark:border-input dark:bg-background dark:text-foreground"
             />
           </div>
 
           {/* Location */}
           <div className="space-y-2">
-            <Label htmlFor="location">Location *</Label>
+            <Label htmlFor="location" className="text-base font-semibold text-[#2F2A78] dark:text-foreground">Location *</Label>
             <Input
               id="location"
               required
               placeholder="City, Country"
               value={profile.location || ''}
               onChange={(e) => setProfile({ ...profile, location: e.target.value })}
+              className="border-[#D6D0F7] bg-[#FCFBFF] text-slate-700 focus-visible:ring-[#8E87E8] dark:border-input dark:bg-background dark:text-foreground"
             />
           </div>
 
-          <Button type="submit" disabled={isSaving} className="w-full">
+          <Button
+            type="submit"
+            disabled={isSaving}
+            className="h-14 w-full rounded-[18px] bg-gradient-to-r from-violet-600 to-fuchsia-600 text-lg font-semibold text-white hover:from-violet-500 hover:to-fuchsia-500"
+          >
             {isSaving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

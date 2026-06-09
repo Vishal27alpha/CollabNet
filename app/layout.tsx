@@ -10,7 +10,7 @@ import { HelpButton } from "@/components/layout/HelpButton";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CreatorConnect - Connect with Instagram Creators",
+  title: "CollabNet - Connect with Instagram Creators",
   description:
     "Find and collaborate with Instagram content creators for sponsorships and partnerships. Build your creator network.",
 };
@@ -48,7 +48,7 @@ import { ToastProvider } from "@/src/components/ui/use-toast";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CreatorConnect - Connect with Instagram Creators",
+  title: "CollabNet - Connect with Instagram Creators",
   description:
     "Find and collaborate with Instagram content creators for sponsorships and partnerships. Build your creator network.",
 };
@@ -88,7 +88,7 @@ import { ToastProvider } from "@/src/components/ui/use-toast";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CreatorConnect - Connect with Instagram Creators",
+  title: "CollabNet - Connect with Instagram Creators",
   description:
     "Find and collaborate with Instagram content creators for sponsorships and partnerships. Build your creator network.",
 };
@@ -116,7 +116,7 @@ import { ToastProvider } from "@/src/components/ui/use-toast";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CreatorConnect - Connect with Instagram Creators",
+  title: "CollabNet - Connect with Instagram Creators",
   description:
     "Find and collaborate with Instagram content creators for sponsorships and partnerships. Build your creator network.",
 };
@@ -138,6 +138,5 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-
 
 

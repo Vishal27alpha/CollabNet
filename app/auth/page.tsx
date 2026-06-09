@@ -38,7 +38,7 @@ export default function AuthPage() {
           <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Users className="w-8 h-8 text-white" />
           </div>
-          <CardTitle className="text-2xl">Welcome to CreatorConnect</CardTitle>
+          <CardTitle className="text-2xl">Welcome to CollabNet</CardTitle>
           <CardDescription className="text-base">
             Connect with fellow Instagram creators for collaborations and sponsorships
           </CardDescription>

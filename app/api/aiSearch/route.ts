@@ -415,6 +415,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { generateEmbedding, chatModel } from "@/lib/gemini"; 
+import { demoCreators } from "@/lib/demo-data";
 
 // cosine similarity
 function cosineSim(a: number[] = [], b: number[] = []): number {
@@ -494,6 +495,106 @@ function lexicalScore(creator: any, queryVariants: string[]) {
   return score;
 }
 
+function parseFollowerNumber(raw: string) {
+  const value = Number.parseFloat(raw.replace(/,/g, ""));
+  if (Number.isNaN(value)) return null;
+
+  if (/m$/i.test(raw)) return value * 1_000_000;
+  if (/k$/i.test(raw)) return value * 1_000;
+  return value;
+}
+
+function getFollowerBounds(query: string) {
+  const match = query.match(/(\d+(?:,\d{3})*(?:\.\d+)?\s*[km]?)\s*(?:followers?|subscribers?|subs?|audience)?/i);
+  const parsed = match ? parseFollowerNumber(match[1].replace(/\s+/g, "")) : null;
+
+  if (!parsed) {
+    return { minFollowers: 0, maxFollowers: Number.POSITIVE_INFINITY };
+  }
+
+  if (/below|under|less than|fewer than|max(?:imum)?|at most/i.test(query)) {
+    return { minFollowers: 0, maxFollowers: parsed };
+  }
+
+  if (/exact|equal/i.test(query)) {
+    return { minFollowers: parsed, maxFollowers: parsed };
+  }
+
+  return { minFollowers: parsed, maxFollowers: Number.POSITIVE_INFINITY };
+}
+
+const NICHE_KEYWORDS: Record<string, string[]> = {
+  "Fitness & Health": ["fitness", "fit", "gym", "workout", "health", "diet"],
+  "Fashion & Beauty": ["fashion", "beauty", "style", "styling", "makeup"],
+  "Food & Cooking": ["food", "cooking", "recipe", "recipes", "cafe"],
+  Travel: ["travel", "trip", "destination", "filmmaker"],
+  Technology: ["technology", "tech", "camera", "smartphone", "gadget"],
+  Lifestyle: ["lifestyle", "routine", "productivity"],
+  Business: ["business", "startup", "entrepreneur"],
+  "Art & Design": ["art", "design", "branding", "ui"],
+  Music: ["music", "song", "podcast"],
+  Photography: ["photography", "photo", "photographer"],
+  Education: ["education", "teacher", "learning"],
+  Gaming: ["gaming", "game", "walkthrough"],
+};
+
+function queryNicheMatches(query: string) {
+  const q = query.toLowerCase();
+  return Object.entries(NICHE_KEYWORDS)
+    .filter(([niche, keywords]) => {
+      const nicheWords = niche.toLowerCase().split(/\W+/).filter(Boolean);
+      return [...nicheWords, ...keywords].some((keyword) => q.includes(keyword));
+    })
+    .map(([niche]) => niche);
+}
+
+function creatorMatchesNiche(creator: any, selectedNiches: string[]) {
+  if (selectedNiches.length === 0) return true;
+
+  const haystack = [
+    creator.niche,
+    creator.bio,
+    creator.about,
+    creator.name,
+    creator.instagramHandle,
+    creator.youtubeHandle,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return selectedNiches.some((niche) => {
+    const keywords = NICHE_KEYWORDS[niche] || [];
+    const nicheWords = niche.toLowerCase().split(/\W+/).filter(Boolean);
+    return [...nicheWords, ...keywords].some((keyword) => haystack.includes(keyword));
+  });
+}
+
+function mergeCreatorsWithDemo(creators: any[]) {
+  const merged = [...creators];
+  const seen = new Set(
+    creators
+      .map((creator) => creator.id || creator.uid || creator.email || creator.name)
+      .filter(Boolean)
+      .map((value) => value.toString().trim().toLowerCase())
+  );
+
+  demoCreators.forEach((creator) => {
+    const keys = [creator.id, creator.uid, creator.email, creator.name]
+      .filter(Boolean)
+      .map((value) => value.toString().trim().toLowerCase());
+
+    if (keys.some((key) => seen.has(key))) {
+      return;
+    }
+
+    keys.forEach((key) => seen.add(key));
+    merged.push(creator);
+  });
+
+  return merged;
+}
+
 export async function POST(req: Request) {
   try {
     const { query } = await req.json();
@@ -501,34 +602,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid query" }, { status: 400 });
     }
 
-    //  1) parse follower constraints from query
-    let minFollowers = 0;
-    let maxFollowers = Infinity;
-    const followerMatch = query.match(/(\d+)\s*followers?/i);
-    if (followerMatch) {
-      const num = parseInt(followerMatch[1], 10);
-      if (/above|over|more than/i.test(query)) minFollowers = num;
-      if (/below|under|less than/i.test(query)) maxFollowers = num;
-      if (/exact|equal/i.test(query)) {
-        minFollowers = num;
-        maxFollowers = num;
-      }
-    }
+    //  1) parse follower and niche constraints from query
+    const { minFollowers, maxFollowers } = getFollowerBounds(query);
+    const selectedNiches = queryNicheMatches(query);
 
     //  2) expand query into variants
     const queryVariants = await expandQueryVariants(query);
 
     //  3) load creators
     const snapshot = await getDocs(collection(db, "creators"));
-    let creators = snapshot.docs.map((d) => ({
+    let creators = mergeCreatorsWithDemo(snapshot.docs.map((d) => ({
       id: d.id,
       ...(d.data() as any),
-    }));
+    })));
 
     //  4) filter by follower constraints
     creators = creators.filter((c: any) => {
       const count = Number(c.followerCount) || 0;
-      return count >= minFollowers && count <= maxFollowers;
+      return (
+        count >= minFollowers &&
+        count <= maxFollowers &&
+        creatorMatchesNiche(c, selectedNiches)
+      );
     });
 
     // 5) embedding-based ranking
@@ -592,6 +687,5 @@ export async function POST(req: Request) {
     );
   }
 }
-
 
 

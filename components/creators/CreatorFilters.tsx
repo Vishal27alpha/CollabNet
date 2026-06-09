@@ -119,22 +119,35 @@ export function CreatorFiltersComponent({ filters, onFiltersChange }: Props) {
   };
 
   return (
-    <div className="p-4 border rounded-lg bg-card shadow-sm space-y-4">
+    <div className="space-y-4 rounded-[24px] border border-[#D8D1F4] bg-white p-6 shadow-[0_10px_30px_rgba(83,74,183,0.08)] dark:border-border dark:bg-card dark:shadow-sm">
       {/* Search */}
       <div>
-        <label className="block text-sm font-medium mb-1">Search</label>
+        <label className="mb-2 block text-lg font-semibold text-[#2F2A78] dark:text-foreground">Search</label>
         <input
           type="text"
           value={filters.searchQuery}
           onChange={(e) => handleChange('searchQuery', e.target.value)}
           placeholder="Search by name or handle..."
-          className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+          className="w-full rounded-2xl border border-[#D6D0F7] bg-[#FCFBFF] px-4 py-3 text-lg text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8E87E8] dark:border-input dark:bg-background dark:px-3 dark:py-2 dark:text-foreground"
         />
+      </div>
+
+      <div>
+        <label className="mb-2 block text-lg font-semibold text-[#2F2A78] dark:text-foreground">Platform</label>
+        <select
+          value={filters.platform}
+          onChange={(e) => handleChange('platform', e.target.value)}
+          className="w-full rounded-2xl border border-[#D6D0F7] bg-[#FCFBFF] px-4 py-3 text-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#8E87E8] dark:border-input dark:bg-background dark:px-3 dark:py-2 dark:text-foreground"
+        >
+          <option value="all">All platforms</option>
+          <option value="instagram">Instagram</option>
+          <option value="youtube">YouTube</option>
+        </select>
       </div>
 
       {/* Niche */}
       <div>
-        <label className="block text-sm font-medium mb-1">Niche</label>
+        <label className="mb-2 block text-lg font-semibold text-[#2F2A78] dark:text-foreground">Niche</label>
         <select
           value={NICHES.includes(filters.niche) ? filters.niche : 'Other'}
           onChange={(e) => {
@@ -146,7 +159,7 @@ export function CreatorFiltersComponent({ filters, onFiltersChange }: Props) {
               setCustomNiche('');
             }
           }}
-          className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+          className="w-full rounded-2xl border border-[#D6D0F7] bg-[#FCFBFF] px-4 py-3 text-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#8E87E8] dark:border-input dark:bg-background dark:px-3 dark:py-2 dark:text-foreground"
         >
           <option value="all">All</option>
           {NICHES.map((niche) => (
@@ -167,18 +180,18 @@ export function CreatorFiltersComponent({ filters, onFiltersChange }: Props) {
               handleChange('niche', e.target.value);
             }}
             placeholder="Enter custom niche..."
-            className="mt-2 w-full px-3 py-2 border rounded-md bg-background text-foreground"
+            className="mt-2 w-full rounded-2xl border border-[#D6D0F7] bg-[#FCFBFF] px-4 py-3 text-lg text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8E87E8] dark:border-input dark:bg-background dark:px-3 dark:py-2 dark:text-foreground"
           />
         )}
       </div>
 
       {/* Followers */}
       <div>
-        <label className="block text-sm font-medium mb-1">Follower Count</label>
+        <label className="mb-2 block text-lg font-semibold text-[#2F2A78] dark:text-foreground">Follower Count</label>
         <select
           value={filters.followerRange}
           onChange={(e) => handleChange('followerRange', e.target.value)}
-          className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+          className="w-full rounded-2xl border border-[#D6D0F7] bg-[#FCFBFF] px-4 py-3 text-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#8E87E8] dark:border-input dark:bg-background dark:px-3 dark:py-2 dark:text-foreground"
         >
           <option value="all">All ranges</option>
           {FOLLOWER_RANGES.map((range) => (
@@ -191,13 +204,13 @@ export function CreatorFiltersComponent({ filters, onFiltersChange }: Props) {
 
       {/* Location */}
       <div>
-        <label className="block text-sm font-medium mb-1">Location</label>
+        <label className="mb-2 block text-lg font-semibold text-[#2F2A78] dark:text-foreground">Location</label>
         <input
           type="text"
           value={filters.location}
           onChange={(e) => handleChange('location', e.target.value)}
           placeholder="Enter city or country..."
-          className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+          className="w-full rounded-2xl border border-[#D6D0F7] bg-[#FCFBFF] px-4 py-3 text-lg text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8E87E8] dark:border-input dark:bg-background dark:px-3 dark:py-2 dark:text-foreground"
         />
       </div>
     </div>

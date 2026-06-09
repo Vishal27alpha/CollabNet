@@ -92,3 +92,41 @@
     @apply transition-colors duration-300;
   }
 }
+
+@keyframes match-score-ring-fill {
+  from {
+    stroke-dashoffset: var(--match-ring-start);
+  }
+
+  to {
+    stroke-dashoffset: var(--match-ring-end);
+  }
+}
+
+@keyframes match-score-value-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.match-score-ring {
+  animation: match-score-ring-fill 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  stroke-dashoffset: var(--match-ring-end);
+}
+
+.match-score-value {
+  animation: match-score-value-reveal 650ms 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-score-ring,
+  .match-score-value {
+    animation: none;
+  }
+}

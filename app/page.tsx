@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,56 @@ import { doc, setDoc } from 'firebase/firestore';
 export default function HomePage() {
   const { user } = useAuth();
   const [showRoleModal, setShowRoleModal] = useState(false);
+  const rotatingHeadlines = [
+    { top: "Connect with", bottom: "Creators & Brands" },
+    { top: "Collaborations", bottom: "Start Here" },
+    { top: "Find. Match.", bottom: "Collaborate." },
+  ];
+  const [headlineIndex, setHeadlineIndex] = useState(0);
+  const [typedHeadline, setTypedHeadline] = useState("");
   const router = useRouter();
+
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let index = 0;
+    let deleting = false;
+    let currentHeadlineIndex = 0;
+
+    const tick = () => {
+      const headlineTarget = rotatingHeadlines[currentHeadlineIndex].bottom;
+
+      if (!deleting) {
+        index += 1;
+        setTypedHeadline(headlineTarget.slice(0, index));
+
+        if (index === headlineTarget.length) {
+          deleting = true;
+          timeoutId = setTimeout(tick, 1400);
+          return;
+        }
+
+        timeoutId = setTimeout(tick, 85);
+        return;
+      }
+
+      index -= 1;
+      setTypedHeadline(headlineTarget.slice(0, index));
+
+      if (index === 0) {
+        deleting = false;
+        currentHeadlineIndex = (currentHeadlineIndex + 1) % rotatingHeadlines.length;
+        setHeadlineIndex(currentHeadlineIndex);
+        timeoutId = setTimeout(tick, 350);
+        return;
+      }
+
+      timeoutId = setTimeout(tick, 45);
+    };
+
+    timeoutId = setTimeout(tick, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   // ✅ Handle role selection + login
   const handleRoleSelect = async (role: "creator" | "brand") => {
@@ -74,8 +123,14 @@ export default function HomePage() {
     {/* Content */}
     <div className="relative container mx-auto px-4 text-center">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-gray-100 mb-6 transition-colors duration-500">
-          Connect with Creators & Brands
+        <h1 className="mb-6 text-5xl font-bold text-gray-900 transition-colors duration-500 dark:text-gray-100 md:text-6xl">
+          <span className="block">{rotatingHeadlines[headlineIndex].top}</span>
+          <span className="block min-h-[1.2em] text-white">
+            <span className="inline-block min-w-[12ch]">
+              {typedHeadline}
+              <span className="ml-1 inline-block animate-pulse text-purple-300">|</span>
+            </span>
+          </span>
         </h1>
         <p className="text-xl text-gray-600 dark:text-gray-400 mb-8 leading-relaxed transition-colors duration-500">
           Find and collaborate with like-minded content creators for sponsorships, 
@@ -151,7 +206,7 @@ export default function HomePage() {
   <div className="relative container mx-auto px-4">
     <div className="text-center mb-16">
       <h2 className="text-3xl font-bold text-foreground">
-        How CreatorConnect Works
+        How CollabNet Works
       </h2>
       <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
         Simple steps to discover, connect, and collaborate with creators in your niche
@@ -219,7 +274,7 @@ export default function HomePage() {
               Ready to start Collaborating?
             </h2>
             <p className="text-lg text-gray-600 mb-8">
-              Join thousands of creators already using CreatorConnect to find 
+              Join thousands of creators already using CollabNet to find 
               their next collaboration partner.
             </p>
 

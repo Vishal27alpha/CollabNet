@@ -14,7 +14,12 @@ export interface Creator {
   uid: string;
   name: string;
   email: string;
+  platform?: 'instagram' | 'youtube';
   instagramHandle: string;
+  youtubeHandle?: string;
+  youtubeChannelId?: string;
+  youtubeChannelTitle?: string;
+  youtubeThumbnailUrl?: string;
   niche: string;
   followerCount: number;
   location: string;
@@ -34,6 +39,7 @@ export interface Creator {
 }
 
 export interface CreatorFilters {
+  platform: string;
   niche: string;
   followerRange: string;
   location: string;
